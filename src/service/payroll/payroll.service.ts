@@ -1,11 +1,9 @@
-
 import { db } from "@/db/database";
 
 import { Transaction } from "kysely";
 import { DB, Employee } from "@/db/types";
 import { IEmployee, IPayrollPeriod, IPayrollProcessRequest } from "@/validations/validation";
 import { CpfRatesService } from "../cpf/cpf-rates.services";
-
 
 export class PayrollService {
   private cpfRatesService: CpfRatesService;
@@ -35,6 +33,7 @@ export class PayrollService {
       })
       .returningAll()
       .executeTakeFirst();
+    console.log("payrollPeriod", payrollPeriod);
     return payrollPeriod;
   }
 

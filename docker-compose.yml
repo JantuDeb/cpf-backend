@@ -20,14 +20,25 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com # Default email for login
       PGADMIN_DEFAULT_PASSWORD: admin_password # Default password for login
     ports:
-      - '8090:80' # Exposes pgAdmin web interface on port 8080
+      - '8090:80' # Exposes pgAdmin web interface on port 8090
     depends_on:
       - db # Ensures PostgreSQL container starts first
     networks:
       - db_network
 
+  redis:
+    image: redis:latest
+    container_name: redis_server
+    ports:
+      - '6379:6379' # Exposes Redis to the host machine
+    networks:
+      - db_network
+    volumes:
+      - redis_data:/data # Optional: persists Redis data
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   db_network:

@@ -8,9 +8,11 @@ const envSchema = z.object({
     .union([z.literal("development"), z.literal("production"), z.literal("test")])
     .default("development"),
   JWT_SECRET: z.string(),
-  REDIS_PORT: z.number(),
+  REDIS_HOST: z.string(),
+  REDIS_PORT: z.coerce.number(),
 });
 
 const env = envSchema.parse(process.env);
+console.log("env", env);
 
 export default env;

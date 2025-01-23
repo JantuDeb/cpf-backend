@@ -1,62 +1,12 @@
 import env from "@/lib/env";
 import { IPayrollProcessRequest } from "@/validations/validation";
 import { Queue, Job } from "bullmq";
-import { Redis } from "ioredis";
-
-// export class QueueService {
-//   private payrollQueue: Queue;
-
-//   constructor() {
-//     const connection = new Redis(env.REDIS_PORT);
-//     this.payrollQueue = new Queue("payroll-queue", { connection });
-//   }
-
-//   async checkExistingPayrollJob(
-//     organizationId: string,
-//     year: number,
-//     month: number,
-//   ): Promise<Job | null> {
-//     const existingJobs = await this.payrollQueue.getJobs(["active", "waiting"]);
-//     return (
-//       existingJobs.find(
-//         (job) =>
-//           job.data.organization_id === organizationId &&
-//           job.data.year === year &&
-//           job.data.month === month,
-//       ) || null
-//     );
-//   }
-
-//   async addPayrollJob(payload: IPayrollProcessRequest): Promise<Job> {
-//     return await this.payrollQueue.add("process-payroll", payload, {
-//       jobId: `payroll-${payload.organization_id}-${payload.year}-${payload.month}`,
-//       removeOnComplete: false,
-//       removeOnFail: false,
-//     });
-//   }
-
-//   async getJobStatus(jobId: string) {
-//     const job = await this.payrollQueue.getJob(jobId);
-//     if (!job) return null;
-
-//     const state = await job.getState();
-
-//     return {
-//       id: job.id,
-//       state,
-//       progress: job.progress || 0,
-//       result: job.returnvalue,
-//       data: job.data,
-//       failedReason: job.failedReason,
-//     };
-//   }
-// }
+import { connection } from "@/db/redis";
 
 export class QueueService {
   private payrollQueue: Queue;
 
   constructor() {
-    const connection = new Redis(env.REDIS_PORT);
     this.payrollQueue = new Queue("payroll-queue", { connection });
   }
 
@@ -65,7 +15,13 @@ export class QueueService {
     year: number,
     month: number,
   ): Promise<Job | null> {
-    const existingJobs = await this.payrollQueue.getJobs(["active", "waiting"]);
+    const existingJobs = await this.payrollQueue.getJobs([
+      "active",
+      "waiting",
+      "completed",
+      "failed",
+      "paused",
+    ]);
     return (
       existingJobs.find(
         (job) =>
@@ -77,7 +33,7 @@ export class QueueService {
   }
 
   async addPayrollJob(payload: IPayrollProcessRequest): Promise<Job> {
-    return await this.payrollQueue.add("process-payroll", payload, {
+    return this.payrollQueue.add("process-payroll", payload, {
       jobId: `payroll-${payload.organization_id}-${payload.year}-${payload.month}`,
       removeOnComplete: false,
       removeOnFail: false,

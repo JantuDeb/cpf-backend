@@ -16,19 +16,27 @@ export class PayrollController {
   async processPayroll(req: Request, res: Response) {
     try {
       const payload = payrollProcessSchema.parse(req.body);
+      console.log("payload", payload);
 
-      // Check for existing job
+      // Check for existing job active, waiting
       const existingJob = await this.queueService.checkExistingPayrollJob(
         payload.organization_id,
         payload.year,
         payload.month,
       );
 
-      if (existingJob) {
+      console.log("existingJob", existingJob);
+
+      if (existingJob && existingJob.id) {
+        const jobStatus = await this.queueService.getJobStatus(existingJob.id);
+
         res.status(409).json({
-          error: "Payroll is already being processed for this period",
+          message: `Payroll job for ${payload.year}-${payload.month} exists`,
           jobId: existingJob.id,
+          status: jobStatus,
+          isNewJob: false,
         });
+
         return;
       }
 
@@ -38,6 +46,7 @@ export class PayrollController {
           payload.organization_id,
           payload.employee_ids,
         );
+        console.log("invalidIds", invalidIds);
 
         if (invalidIds.length) {
           res.status(400).json({

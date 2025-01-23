@@ -13,6 +13,7 @@ import healthRoute from "./routes/health.route";
 import organizationRoutes from "./routes/organization.routes";
 import employeeRoutes from "./routes/employee.routes";
 import departmentRoutes from "./routes/department.routes";
+import payrollRoutes from "./routes/payroll.routes";
 
 //Error util
 import HttpStatusCodes from "./lib/http-status.code";
@@ -38,6 +39,7 @@ app.use("/api_v1", healthRoute);
 app.use("/api_v1", organizationRoutes);
 app.use("/api_v1", employeeRoutes);
 app.use("/api_v1", departmentRoutes);
+app.use("/api_v1", payrollRoutes);
 
 // Error middlewares
 

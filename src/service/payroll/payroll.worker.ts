@@ -1,102 +1,78 @@
-// import { Worker, Job } from "bullmq";
-// import { Redis } from "ioredis";
-// import env from "@/lib/env";
-// import { IPayrollProcessRequest } from "@/validations/validation";
-// import { PayrollService } from "@/service/payroll/payroll.service";
+import { Worker, Job } from "bullmq";
+import { IPayrollProcessRequest } from "@/validations/validation";
+import { PayrollService } from "@/service/payroll/payroll.service";
+import { connection } from "@/db/redis";
+export class PayrollWorker {
+  worker: Worker;
+  private payrollService: PayrollService;
 
-// export class PayrollWorker {
-//    worker: Worker;
-//   private payrollService: PayrollService;
+  constructor() {
+    this.payrollService = new PayrollService();
+    this.worker = new Worker(
+      "payroll-queue",
+      async (job: Job) => {
+        await this.processJob(job);
+      },
+      {
+        connection,
+        concurrency: 1,
+        limiter: {
+          max: 1,
+          duration: 1000, // Rate limit: 1 job per second
+        },
+      },
+    );
+    this.setupWorkerEvents();
+  }
 
-//   constructor() {
-//     const connection = new Redis(env.REDIS_PORT);
-//     this.payrollService = new PayrollService();
+  private setupWorkerEvents() {
+    this.worker.on("completed", (job) => {
+      console.log(`Job ${job.id} completed successfully`);
+      console.log("Result:", job.returnvalue);
+    });
 
-//     this.worker = new Worker(
-//       "payroll-queue",
-//       async (job: Job) => {
-//         await this.processJob(job);
-//       },
-//       {
-//         connection,
-//         concurrency: 1, // Process one job at a time
-//       },
-//     );
+    this.worker.on("failed", (job, error) => {
+      console.error(`Job ${job?.id} failed:`, error);
+    });
 
-//     this.setupWorkerEvents();
-//   }
+    this.worker.on("error", (error) => {
+      console.error("Worker error:", error);
+    });
 
-//   private setupWorkerEvents() {
-//     this.worker.on("completed", (job) => {
-//       console.log(`Job ${job.id} completed successfully`);
-//     });
+    this.worker.on("active", (job) => {
+      console.log(`Processing job ${job.id}`);
+    });
 
-//     this.worker.on("failed", (job, error) => {
-//       console.error(`Job ${job?.id} failed:`, error);
-//     });
+    this.worker.on("progress", (job, progress) => {
+      console.log(`Job ${job.id} progress: ${progress}%`);
+    });
+  }
 
-//     this.worker.on("error", (error) => {
-//       console.error("Worker error:", error);
-//     });
-//   }
+  private async processJob(job: Job<IPayrollProcessRequest>) {
+    const { organization_id, year, month, employee_ids } = job.data;
 
-//   private async processJob(job: Job<IPayrollProcessRequest>) {
-//     const { organization_id, year, month, employee_ids } = job.data;
+    try {
+      // Update job progress
+      await job.updateProgress(10);
+      console.log(`Starting payroll processing for org ${organization_id}`);
 
-//     try {
-//       // Update progress to started
-//       await job.updateProgress(0);
+      const processed = await this.payrollService.processPayroll(job.data);
 
-//       // Get employees to process
-//       const employees = employee_ids?.length
-//         ? await this.payrollService.getEmployees(organization_id, employee_ids)
-//         : await this.payrollService.getAllEmployees(organization_id);
+      // Update final progress
+      await job.updateProgress(100);
 
-//       const totalEmployees = employees.length;
-//       let processedCount = 0;
-
-//       // Process each employee's payroll
-//       for (const employee of employees) {
-//         try {
-//           await this.payrollService.processEmployeePayroll({
-//             organization_id,
-//             employee_id: employee.id,
-//             year,
-//             month,
-//           });
-
-//           processedCount++;
-//           await job.updateProgress((processedCount / totalEmployees) * 100);
-//         } catch (error) {
-//           console.error(`Failed to process payroll for employee ${employee.id}:`, error);
-//           // Continue processing other employees even if one fails
-//         }
-//       }
-
-//       // Return summary
-//       return {
-//         organization_id,
-//         year,
-//         month,
-//         total_employees: totalEmployees,
-//         processed_employees: processedCount,
-//         success_rate: (processedCount / totalEmployees) * 100,
-//       };
-//     } catch (error) {
-//       console.error(`Failed to process payroll job ${job.id}:`, error);
-//       throw error; // This will mark the job as failed
-//     }
-//   }
-// }
-
-// // Start the worker
-// const worker = new PayrollWorker();
-
-// // Handle process termination
-// process.on("SIGTERM", async () => {
-//   await worker.worker.close();
-// });
-
-// process.on("SIGINT", async () => {
-//   await worker.worker.close();
-// });
+      if (processed) {
+        return {
+          organization_id,
+          year,
+          month,
+          processed,
+          completedAt: new Date().toISOString(),
+        };
+      }
+    } catch (error) {
+      console.error(`Failed to process payroll job ${job.id}:`, error);
+      throw error;
+    }
+  }
+}

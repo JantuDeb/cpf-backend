@@ -1,0 +1,34 @@
+services:
+  db:
+    image: 'postgres:latest'
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: cpf_user
+      POSTGRES_PASSWORD: cpf_password
+      POSTGRES_DB: cpf_db
+    ports:
+      - '5432:5432' # Exposes PostgreSQL to the host machine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persists data
+    networks:
+      - db_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest # Latest pgAdmin image
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com # Default email for login
+      PGADMIN_DEFAULT_PASSWORD: admin_password # Default password for login
+    ports:
+      - '8080:80' # Exposes pgAdmin web interface on port 8080
+    depends_on:
+      - db # Ensures PostgreSQL container starts first
+    networks:
+      - db_network
+
+volumes:
+  postgres_data:
+
+networks:
+  db_network:
+    driver: bridge

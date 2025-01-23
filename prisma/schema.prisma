@@ -1,0 +1,288 @@
+// schema.prisma
+
+generator kysely {
+    provider = "prisma-kysely"
+
+    // Optionally provide a destination directory for the generated file
+    // and a filename of your choice
+    output = "../src/db"
+    fileName = "types.ts"
+    // Optionally generate runtime enums to a separate file
+     enumFileName = "enums.ts"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// Enums
+enum OrgType {
+    GROUP           // Top level holding group
+    DIVISION        // Business division
+    LEGAL_ENTITY    // Registered company with UEN
+    BRANCH          // Branch office
+    COST_CENTER     // For accounting purposes
+}
+
+enum EmploymentType {
+    PERMANENT
+    CONTRACT
+    TEMPORARY
+    PART_TIME
+}
+
+enum CitizenshipStatus {
+    CITIZEN
+    PR_FIRST_YEAR
+    PR_SECOND_YEAR
+    PR_THIRD_YEAR_ONWARDS
+    FOREIGNER
+}
+
+enum PaymentStatus {
+    PENDING
+    PROCESSED
+    FAILED
+    CANCELLED
+}
+
+enum LeaveStatus {
+    PENDING
+    APPROVED
+    REJECTED
+    CANCELLED
+}
+
+// Organization & Structure
+model Organization {
+    id                String     @id @default(dbgenerated("gen_random_uuid()"))
+    parent_id         String?    
+    name              String
+    type              OrgType
+    
+    // For legal entities only
+    uen               String?    @unique  // Only for type LEGAL_ENTITY
+    registration_date DateTime?  // Only for type LEGAL_ENTITY
+    cpf_submission_num String?   // Only for type LEGAL_ENTITY
+    
+    // Relations
+    // parent            organization?  @relation("OrgHierarchy", fields: [parent_id], references: [id])
+    // children          organization[] @relation("OrgHierarchy")
+    departments       department[]
+    employees         Employee[]
+    payroll_periods   PayrollPeriod[]
+
+    created_at        DateTime   @default(now())
+    updated_at        DateTime   @updatedAt
+    deleted_at        DateTime?
+
+    @@index([type])
+    @@index([uen])
+    @@map("organizations")
+}
+
+model department {
+    id              String       @id @default(dbgenerated("gen_random_uuid()"))
+    organization_id String
+    name            String
+    code            String
+    
+    // Relations
+    organization    Organization @relation(fields: [organization_id], references: [id])
+    employees       Employee[]
+    parent_dept_id  String?
+    parent_dept     department?  @relation("DepartmentHierarchy", fields: [parent_dept_id], references: [id])
+    child_depts     department[] @relation("DepartmentHierarchy")
+
+    created_at      DateTime     @default(now())
+    updated_at      DateTime     @updatedAt
+    deleted_at      DateTime?
+
+    @@unique([organization_id, code])
+    @@map("departments")
+}
+
+// Employee Management
+model Employee {
+    id                  String           @id @default(dbgenerated("gen_random_uuid()"))
+    organization_id     String
+    department_id       String?
+    employee_id         String          // Internal employee ID
+    name                String
+    email              String?          @unique
+    contact_number     String?
+    nric               String           // National ID/FIN
+    date_of_birth      DateTime
+    date_joined        DateTime
+    employment_type    EmploymentType
+    citizenship_status CitizenshipStatus
+    is_active          Boolean          @default(true)
+    emergency_contact  Json?            // Emergency contact details
+    bank_details       Json?            // Bank account information
+    documents          Json?            // Document references/links
+    
+    // Salary information
+    basic_salary       Decimal          @db.Decimal(10, 2)
+    allowances         Decimal          @db.Decimal(10, 2) @default(0)
+    
+    // Relations
+    organization       Organization     @relation(fields: [organization_id], references: [id])
+    department         department?      @relation(fields: [department_id], references: [id])
+    salary_history     SalaryHistory[]
+    cpf_contributions  CpfContribution[]
+    additional_wages   AdditionalWage[]
+    leave_balances     LeaveBalance[]
+    leave_requests     LeaveRequest[]
+    
+    created_at         DateTime         @default(now())
+    updated_at         DateTime         @updatedAt
+    deleted_at         DateTime?
+
+    @@unique([organization_id, employee_id])
+    @@unique([organization_id, nric])
+    @@index([organization_id, department_id])
+    @@index([is_active])
+    @@index([date_joined])
+    @@map("employees")
+}
+
+// Payroll Management
+model PayrollPeriod {
+    id                String            @id @default(dbgenerated("gen_random_uuid()"))
+    organization_id   String
+    year_month        DateTime          // YYYY-MM-01 format
+    start_date        DateTime
+    end_date          DateTime
+    is_processed      Boolean           @default(false)
+    processed_at      DateTime?
+    
+    // Relations
+    organization      Organization      @relation(fields: [organization_id], references: [id])
+    cpf_contributions CpfContribution[]
+    
+    created_at        DateTime          @default(now())
+    updated_at        DateTime          @updatedAt
+
+    @@unique([organization_id, year_month])
+    @@map("payroll_periods")
+}
+
+model SalaryHistory {
+    id               String    @id @default(dbgenerated("gen_random_uuid()"))
+    employee_id      String
+    effective_date   DateTime
+    basic_salary     Decimal   @db.Decimal(10, 2)
+    allowances       Decimal   @db.Decimal(10, 2)
+    reason           String?   // Promotion, Annual Review, etc.
+    remarks          String?
+    
+    // Relations
+    employee         Employee  @relation(fields: [employee_id], references: [id])
+    
+    created_at       DateTime  @default(now())
+    updated_at       DateTime  @updatedAt
+
+    @@index([employee_id, effective_date])
+    @@map("salary_histories")
+}
+
+model CpfContribution {
+    id                    String         @id @default(dbgenerated("gen_random_uuid()"))
+    employee_id           String
+    payroll_period_id     String
+    
+    // Wage information
+    ordinary_wages        Decimal        @db.Decimal(10, 2)
+    additional_wages      Decimal        @db.Decimal(10, 2) @default(0)
+    
+    // Contribution details
+    employee_contribution Decimal        @db.Decimal(10, 2)
+    employer_contribution Decimal        @db.Decimal(10, 2)
+    
+    // Account allocation
+    ordinary_account      Decimal        @db.Decimal(10, 2)
+    special_account      Decimal        @db.Decimal(10, 2)
+    medisave_account     Decimal        @db.Decimal(10, 2)
+    
+    // Payment tracking
+    status               PaymentStatus @default(PENDING)
+    paid_at              DateTime?
+    payment_reference    String?
+    
+    // Relations
+    employee             Employee       @relation(fields: [employee_id], references: [id])
+    payroll_period       PayrollPeriod @relation(fields: [payroll_period_id], references: [id])
+    
+    created_at           DateTime       @default(now())
+    updated_at          DateTime       @updatedAt
+
+    @@unique([employee_id, payroll_period_id])
+    @@index([payroll_period_id, status])
+    @@map("cpf_contributions")
+}
+
+model AdditionalWage {
+    id             String    @id @default(dbgenerated("gen_random_uuid()"))
+    employee_id    String
+    payment_date   DateTime
+    amount         Decimal   @db.Decimal(10, 2)
+    description    String    // Bonus, Commission, etc.
+    remarks        String?
+    
+    // Relations
+    employee       Employee  @relation(fields: [employee_id], references: [id])
+    
+    created_at     DateTime  @default(now())
+    updated_at     DateTime  @updatedAt
+
+    @@index([employee_id, payment_date])
+    @@map("additional_wages")
+}
+
+// Leave Management
+model LeaveBalance {
+    id          String    @id @default(dbgenerated("gen_random_uuid()"))
+    employee_id String
+    leave_type  String    // Annual, Medical, etc.
+    year        Int
+    entitled    Decimal   @db.Decimal(5,2)
+    taken       Decimal   @db.Decimal(5,2)
+    remaining   Decimal   @db.Decimal(5,2)
+    
+    employee    Employee  @relation(fields: [employee_id], references: [id])
+    
+    @@unique([employee_id, leave_type, year])
+    @@map("leave_balances")
+}
+
+model LeaveRequest {
+    id          String        @id @default(dbgenerated("gen_random_uuid()"))
+    employee_id String
+    leave_type  String
+    start_date  DateTime
+    end_date    DateTime
+    status      LeaveStatus  @default(PENDING)
+    remarks     String?
+    
+    employee    Employee      @relation(fields: [employee_id], references: [id])
+    
+    created_at  DateTime      @default(now())
+    updated_at  DateTime      @updatedAt
+    @@map("leave_requests")
+}
+
+// Audit Trail
+model AuditLog {
+    id              String      @id @default(dbgenerated("gen_random_uuid()"))
+    entity_type     String      // e.g., "employee", "salary"
+    entity_id       String      // ID of the changed record
+    action          String      // CREATE, UPDATE, DELETE
+    changes         Json        // Store the changes
+    performed_by    String      // User ID who made the change
+    created_at      DateTime    @default(now())
+
+    @@index([entity_type, entity_id])
+    @@index([created_at])
+    @@map("audit_logs")
+}

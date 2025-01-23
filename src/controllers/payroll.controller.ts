@@ -16,7 +16,6 @@ export class PayrollController {
   async processPayroll(req: Request, res: Response) {
     try {
       const payload = payrollProcessSchema.parse(req.body);
-      console.log("payload", payload);
 
       // Check for existing job active, waiting
       const existingJob = await this.queueService.checkExistingPayrollJob(
@@ -25,7 +24,6 @@ export class PayrollController {
         payload.month,
       );
 
-      console.log("existingJob", existingJob);
 
       if (existingJob && existingJob.id) {
         const jobStatus = await this.queueService.getJobStatus(existingJob.id);

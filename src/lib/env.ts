@@ -12,6 +12,7 @@ const envSchema = z.object({
   REDIS_PORT: z.coerce.number(),
 });
 
+console.log("process.env", process.env.REDIS_PORT);
 const env = envSchema.parse(process.env);
 console.log("env", env);
 

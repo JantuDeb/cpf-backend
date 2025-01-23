@@ -18,6 +18,7 @@ import payrollRoutes from "./routes/payroll.routes";
 //Error util
 import HttpStatusCodes from "./lib/http-status.code";
 import { RouteError } from "./lib/route-error";
+import { MulterError } from "multer";
 
 const app = express();
 
@@ -51,6 +52,11 @@ app.use((err: Error, _: Request, res: Response, next: NextFunction) => {
   if (err instanceof RouteError) {
     status_code = err.status_code;
     res.status(err.status_code).json(err);
+  }
+
+  if (err instanceof MulterError) {
+    status_code = HttpStatusCodes.BAD_REQUEST;
+    res.status(status_code).json({ error: err.message });
   }
   if (isZodErrorLike(err)) {
     status_code = HttpStatusCodes.BAD_REQUEST;

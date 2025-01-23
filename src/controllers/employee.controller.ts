@@ -11,6 +11,7 @@ import { Readable } from "node:stream";
 // Get all employees
 export const getAllEmployees = asyncHandler(async (req: Request, res: Response) => {
   const { organizationId } = req.params;
+  await new Promise((resolve) => setTimeout(resolve, 1000)); 
   const employees = await db
     .selectFrom("employees")
     .selectAll()
@@ -101,9 +102,11 @@ export const bulkImportEmployees = asyncHandler(async (req: Request, res: Respon
     res.status(400).json({ error: "No CSV file uploaded" });
     return;
   }
+  console.log("req.file", req.file);
 
   const { organization_id } = req.body;
   const jsonArray = await csv().fromStream(Readable.from(req.file.buffer));
+  console.log("jsonArray", jsonArray);
   const updated_at = new Date();
 
   const validatedEmployees = jsonArray.map((emp) =>

@@ -20,7 +20,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com # Default email for login
       PGADMIN_DEFAULT_PASSWORD: admin_password # Default password for login
     ports:
-      - '8080:80' # Exposes pgAdmin web interface on port 8080
+      - '8090:80' # Exposes pgAdmin web interface on port 8080
     depends_on:
       - db # Ensures PostgreSQL container starts first
     networks:

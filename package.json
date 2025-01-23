@@ -19,6 +19,7 @@
     "@types/multer": "^1.4.12",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.35.1",
     "cors": "^2.8.5",
     "csvtojson": "^2.0.10",
     "express": "^5.0.1",

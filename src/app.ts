@@ -10,10 +10,13 @@ import env from "./lib/env";
 //Routes
 
 import healthRoute from "./routes/health.route";
-import organisationRoutes from "./routes/organisation.routes";
+import organizationRoutes from "./routes/organization.routes";
+import employeeRoutes from "./routes/employee.routes";
+import departmentRoutes from "./routes/department.routes";
+
+//Error util
 import HttpStatusCodes from "./lib/http-status.code";
 import { RouteError } from "./lib/route-error";
-import { ZodError } from "zod";
 
 const app = express();
 
@@ -28,11 +31,13 @@ app.use(
 );
 
 app.use(express.json());
-app.use(express.urlencoded());
+// app.use(express.urlencoded());
 
 // Routes
 app.use("/api_v1", healthRoute);
-app.use("/api_v1", organisationRoutes);
+app.use("/api_v1", organizationRoutes);
+app.use("/api_v1", employeeRoutes);
+app.use("/api_v1", departmentRoutes);
 
 // Error middlewares
 
@@ -40,16 +45,22 @@ app.use("/api_v1", organisationRoutes);
 app.use((err: Error, _: Request, res: Response, next: NextFunction) => {
   if (env.NODE_ENV !== "test") {
   }
-  let status = HttpStatusCodes.BAD_REQUEST;
+  let status_code = HttpStatusCodes.BAD_REQUEST;
   if (err instanceof RouteError) {
-    status = err.status;
-    res.status(status).json({ error: err.message });
+    status_code = err.status_code;
+    res.status(err.status_code).json(err);
   }
   if (isZodErrorLike(err)) {
-    status = HttpStatusCodes.BAD_REQUEST;
-    res.status(status).json({ error: fromZodError(err) });
+    status_code = HttpStatusCodes.BAD_REQUEST;
+    res.status(status_code).json({ error: fromZodError(err) });
   }
 
+  console.log("err", err);
+  if (err.message) {
+    status_code = HttpStatusCodes.SERVICE_UNAVAILABLE;
+    res.status(status_code).json({ error: err.message });
+    return;
+  }
   return next(err);
 });
 

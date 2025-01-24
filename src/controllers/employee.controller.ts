@@ -6,9 +6,12 @@ import { Request, Response } from "express";
 import asyncHandler from "express-async-handler";
 import { z } from "zod";
 import csv from "csvtojson";
+import { Readable } from "node:stream";
+
 // Get all employees
 export const getAllEmployees = asyncHandler(async (req: Request, res: Response) => {
   const { organizationId } = req.params;
+  await new Promise((resolve) => setTimeout(resolve, 1000)); 
   const employees = await db
     .selectFrom("employees")
     .selectAll()
@@ -99,26 +102,25 @@ export const bulkImportEmployees = asyncHandler(async (req: Request, res: Respon
     res.status(400).json({ error: "No CSV file uploaded" });
     return;
   }
+  console.log("req.file", req.file);
 
-  const jsonArray = await csv().fromString(req.file.buffer.toString());
+  const { organization_id } = req.body;
+  const jsonArray = await csv().fromStream(Readable.from(req.file.buffer));
+  console.log("jsonArray", jsonArray);
+  const updated_at = new Date();
 
   const validatedEmployees = jsonArray.map((emp) =>
     employeeSchema.parse({
       ...emp,
-      organization_id: req.body.organization_id,
+      organization_id,
+      updated_at,
+      is_active: true,
     }),
   );
 
-  const result = db.insertInto("employees").values(
-    validatedEmployees.map((emp) => ({
-      ...emp,
-      is_active: true,
-      updated_at: new Date(),
-    })),
-  );
+  await db.insertInto("employees").values(validatedEmployees).executeTakeFirstOrThrow();
 
   res.status(201).json({
     message: `Successfully imported  employees`,
-    imported: result,
   });
 });

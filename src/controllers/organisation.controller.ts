@@ -17,6 +17,7 @@ export const getOrganization = asyncHandler(async (req: Request, res: Response) 
     .selectAll()
     .where("id", "=", id)
     .executeTakeFirst();
+
   if (!organization) {
     res.status(404).json({ error: "Organization not found" });
   } else {

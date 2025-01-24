@@ -1,6 +1,6 @@
 import { db } from "@/db/database";
 import { initialSeedData } from "@/seed/initial-data";
-import { EmployeeBulkImport } from "@/types/bulk-operations";
+import { EmployeeBulkImport } from "@/types";
 import { employeeBulkImportSchema } from "@/validations/validation";
 
 export async function bulkImportEmployees(organizationId: string, employees: EmployeeBulkImport[]) {
